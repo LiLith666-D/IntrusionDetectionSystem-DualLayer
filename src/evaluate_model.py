@@ -3,128 +3,144 @@ import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score
+)
 
 
-def load_test_data(splits_path):
-    """
-    Load test dataset
-    """
-    X_test = pd.read_csv(os.path.join(splits_path, "X_test.csv"))
-    y_test = pd.read_csv(os.path.join(splits_path, "y_test.csv"))["Label"]
+def load_data_and_model(base_path, model_type="multiclass"):
 
-    print("[*] Test data loaded successfully")
-    return X_test, y_test
+    splits_path = os.path.join(base_path, "data", "splits")
+    models_path = os.path.join(base_path, "models")
+
+    if model_type == "multiclass":
+        model_path = os.path.join(models_path, "random_forest_ids.pkl")
+        X_test = pd.read_csv(os.path.join(splits_path, "X_test.csv"))
+        y_test = pd.read_csv(os.path.join(splits_path, "y_test.csv"))["Label"]
+        label_encoder = joblib.load(os.path.join(models_path, "label_encoder.pkl"))
+
+        class_names = label_encoder.classes_
+
+    elif model_type == "binary":
+        model_path = os.path.join(models_path, "binary_ids.pkl")
+
+        # Reload dataset for binary split
+        data_path = os.path.join(base_path, "data", "processed", "cleaned_dataset.csv")
+        df = pd.read_csv(data_path)
+        df.columns = df.columns.str.strip()
+
+        df["Binary_Label"] = df["Label"].apply(
+            lambda x: 0 if x == "BENIGN" else 1
+        )
+
+        from sklearn.model_selection import train_test_split
+
+        X = df.drop(["Label", "Binary_Label"], axis=1)
+        y = df["Binary_Label"]
+
+        _, X_test, _, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
+
+        class_names = ["BENIGN", "ATTACK"]
+
+    else:
+        raise ValueError("Invalid model type")
+
+    model = joblib.load(model_path)
+
+    return model, X_test, y_test, class_names
 
 
-def load_model_and_encoder(models_path):
-    """
-    Load trained model and label encoder
-    """
-    model = joblib.load(os.path.join(models_path, "random_forest_ids.pkl"))
-    label_encoder = joblib.load(os.path.join(models_path, "label_encoder.pkl"))
+def evaluate_model(model, X_test, y_test, class_names, results_path, model_type):
 
-    print("[*] Model and label encoder loaded successfully")
-    return model, label_encoder
+    print(f"\n[*] Evaluating {model_type.upper()} model")
 
-
-def evaluate_model(model, X_test, y_test, label_encoder):
-    """
-    Generate evaluation metrics
-    """
     y_pred = model.predict(X_test)
 
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"[✓] Test Accuracy: {accuracy:.4f}")
+    acc = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, average="weighted")
+    recall = recall_score(y_test, y_pred, average="weighted")
+    f1 = f1_score(y_test, y_pred, average="weighted")
+
+    print(f"[✓] Accuracy : {acc:.4f}")
+    print(f"[✓] Precision: {precision:.4f}")
+    print(f"[✓] Recall   : {recall:.4f}")
+    print(f"[✓] F1 Score : {f1:.4f}")
+
+    os.makedirs(results_path, exist_ok=True)
 
     report = classification_report(
         y_test,
         y_pred,
-        target_names=label_encoder.classes_,
+        target_names=class_names,
         output_dict=True
     )
 
-    return y_pred, report, accuracy
-
-
-def save_classification_report(report, results_path):
-    """
-    Save classification report as text file
-    """
-    os.makedirs(results_path, exist_ok=True)
-
     report_df = pd.DataFrame(report).transpose()
-    report_file = os.path.join(results_path, "classification_report.csv")
-    report_df.to_csv(report_file)
-
-    print(f"[✓] Classification report saved to: {report_file}")
-
-
-def plot_confusion_matrix(y_test, y_pred, label_encoder, results_path):
-    """
-    Plot and save confusion matrix
-    """
-    cm = confusion_matrix(y_test, y_pred)
-
-    plt.figure(figsize=(14, 12))
-    sns.heatmap(
-        cm,
-        xticklabels=label_encoder.classes_,
-        yticklabels=label_encoder.classes_,
-        annot=False,
-        cmap="Blues"
+    report_df.to_csv(
+        os.path.join(results_path, f"{model_type}_classification_report.csv")
     )
 
-    plt.title("Confusion Matrix - Random Forest IDS")
-    plt.xlabel("Predicted Label")
-    plt.ylabel("True Label")
+    cm = confusion_matrix(y_test, y_pred)
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=class_names,
+        yticklabels=class_names
+    )
+
+    plt.title(f"Confusion Matrix - {model_type.upper()} IDS")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
     plt.tight_layout()
 
-    cm_path = os.path.join(results_path, "confusion_matrix.png")
-    plt.savefig(cm_path)
+    plt.savefig(os.path.join(results_path, f"{model_type}_confusion_matrix.png"))
     plt.close()
 
-    print(f"[✓] Confusion matrix saved to: {cm_path}")
-
-
-def save_summary(accuracy, results_path):
-    """
-    Save evaluation summary
-    """
-    summary_path = os.path.join(results_path, "evaluation_summary.txt")
-
-    with open(summary_path, "w") as f:
-        f.write("Random Forest Intrusion Detection System Evaluation\n")
-        f.write("=================================================\n")
-        f.write(f"Test Accuracy: {accuracy:.4f}\n")
-
-    print(f"[✓] Evaluation summary saved to: {summary_path}")
+    print(f"[✓] Results saved in: {results_path}")
 
 
 def main():
-    """
-    Main evaluation pipeline
-    """
     base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    splits_path = os.path.join(base_path, "data", "splits")
-    models_path = os.path.join(base_path, "models")
     results_path = os.path.join(base_path, "results")
 
-    print("[*] Starting model evaluation pipeline")
-
-    X_test, y_test = load_test_data(splits_path)
-    model, label_encoder = load_model_and_encoder(models_path)
-
-    y_pred, report, accuracy = evaluate_model(
-        model, X_test, y_test, label_encoder
+    model, X_test, y_test, class_names = load_data_and_model(
+        base_path,
+        model_type="multiclass"
+    )
+    evaluate_model(
+        model,
+        X_test,
+        y_test,
+        class_names,
+        results_path,
+        "multiclass"
     )
 
-    save_classification_report(report, results_path)
-    plot_confusion_matrix(y_test, y_pred, label_encoder, results_path)
-    save_summary(accuracy, results_path)
+    model, X_test, y_test, class_names = load_data_and_model(
+        base_path,
+        model_type="binary"
+    )
+    evaluate_model(
+        model,
+        X_test,
+        y_test,
+        class_names,
+        results_path,
+        "binary"
+    )
 
-    print("[✓] Model evaluation completed successfully")
+    print("\n[✓] Evaluation for both models completed successfully")
 
 
 if __name__ == "__main__":

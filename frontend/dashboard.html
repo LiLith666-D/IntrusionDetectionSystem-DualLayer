@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentryAI — IoT Intrusion Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg-main: #0e0d0c;
+    --bg-panel: #161412;
+    --border-soft: #2a2521;
+    --text-main: #f2eee9;
+    --text-muted: #a59b91;
+    --mocha: #6f4e37;
+    --latte: #c8b6a6;
+    --caramel: #b08968;
+    --success: #7da37d;
+    --danger: #c97b63;
+    --danger-soft: rgba(201,123,99,0.1);
+    --success-soft: rgba(125,163,125,0.1);
+    --caramel-soft: rgba(176,137,104,0.1);
+    --font-display: 'Orbitron', monospace;
+    --font-body: 'Rajdhani', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: radial-gradient(circle at top, #141210, var(--bg-main));
+    background-attachment: fixed;
+    color: var(--text-main);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 400;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 30px;
+    background: linear-gradient(180deg, #1b1815, #13110f);
+    border-bottom: 1px solid var(--border-soft);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-left { display:flex; align-items:center; gap:14px; }
+
+  .logo-mark {
+    width: 36px; height: 36px;
+    border: 1.5px solid var(--caramel);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display);
+    color: var(--caramel);
+    font-size: 13px; font-weight: 700;
+  }
+
+  .logo-text {
+    font-family: var(--font-display);
+    font-size: 15px; font-weight: 700;
+    color: var(--latte);
+    letter-spacing: 2px;
+  }
+
+  .logo-sub {
+    font-family: var(--font-body);
+    font-size: 11px; color: var(--text-muted);
+    font-weight: 400; margin-top: 2px;
+    letter-spacing: 0.5px;
+  }
+
+  .header-right { display:flex; align-items:center; gap:22px; }
+
+  .status-pill { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-muted); font-weight:500; }
+
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse-dot 2.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%,100% { box-shadow:0 0 5px var(--success); }
+    50% { box-shadow:0 0 14px var(--success); }
+  }
+
+  .header-time {
+    font-family: var(--font-display);
+    font-size: 12px; color: var(--caramel);
+    font-weight: 500; letter-spacing: 1px;
+  }
+
+  .pi-status {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 500; color: var(--text-muted);
+    background: rgba(111,78,55,0.1);
+    padding: 5px 12px; border-radius: 4px;
+    border: 1px solid rgba(111,78,55,0.25);
+  }
+
+  .pi-dot { width:6px; height:6px; border-radius:50%; background:var(--success); }
+
+  /* ─── PROC BAR ─── */
+  .proc-bar { height: 2px; background: var(--border-soft); overflow: hidden; }
+  .proc-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--mocha), var(--caramel), var(--latte));
+    transition: width 0.7s ease;
+  }
+
+  /* ─── THREAT TICKER ─── */
+  .threat-ticker {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 30px;
+    background: linear-gradient(180deg, #1a1714, #121009);
+    border-bottom: 1px solid var(--border-soft);
+    gap: 18px; flex-wrap: wrap;
+  }
+
+  .tk-group { display:flex; align-items:center; gap:10px; }
+  .tk-label { font-family:var(--font-body); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); white-space:nowrap; }
+  .tk-val { font-family:var(--font-display); font-size:15px; font-weight:600; color:var(--text-main); min-width:38px; transition:color 0.3s; }
+  .tk-div { width:1px; height:28px; background:var(--border-soft); flex-shrink:0; }
+
+  .threat-wrap { display:flex; align-items:center; gap:10px; }
+  .threat-segs { display:flex; gap:3px; }
+  .t-seg { width:22px; height:12px; border-radius:2px; background:rgba(42,37,33,0.8); transition:background 0.4s, box-shadow 0.4s; }
+  .t-seg.low { background:var(--success); }
+  .t-seg.medium { background:var(--caramel); box-shadow:0 0 6px rgba(176,137,104,.4); }
+  .t-seg.high { background:#b87a4a; box-shadow:0 0 6px rgba(184,122,74,.4); }
+  .t-seg.critical { background:var(--danger); box-shadow:0 0 8px rgba(201,123,99,.6); animation:seg-blink 0.7s ease infinite alternate; }
+  @keyframes seg-blink { from{opacity:1;} to{opacity:.35;} }
+  .threat-lbl { font-family:var(--font-display); font-size:11px; font-weight:600; letter-spacing:1px; min-width:56px; transition:color 0.4s; color:var(--text-muted); }
+
+  /* ─── MAIN ─── */
+  main { padding:20px 30px; display:flex; flex-direction:column; gap:18px; max-width:1680px; margin:0 auto; }
+
+  .sec-row { display:flex; align-items:center; gap:12px; margin-bottom:13px; }
+  .sec-lbl {
+    font-family: var(--font-display);
+    font-size: 9px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--mocha); white-space: nowrap;
+  }
+  .div-line { flex:1; height:1px; background: linear-gradient(90deg, var(--border-soft), transparent); }
+
+  /* ─── CARD ─── */
+  .card {
+    background: linear-gradient(180deg, #1b1815, #13110f);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+  }
+
+  /* ─── LEVEL 1 ─── */
+  .l1-grid { display:grid; grid-template-columns:1.15fr 1fr; gap:16px; align-items:stretch; }
+
+  .det-box {
+    background: linear-gradient(180deg, #1b1815, #13110f);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 22px 26px;
+    position: relative; overflow: hidden;
+    transition: border-color .5s, box-shadow .5s;
+  }
+
+  .det-box::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: var(--success);
+    transition: background .5s;
+  }
+
+  .det-box.attack::before { background: var(--danger); }
+  .det-box.attack { box-shadow: 0 0 0 1px rgba(201,123,99,.1), inset 0 0 40px rgba(201,123,99,.025); }
+
+  .box-lbl {
+    font-family: var(--font-display); font-size: 9px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--mocha); margin-bottom: 16px;
+  }
+
+  .ts-row { display:flex; align-items:center; gap:13px; margin-bottom:20px; }
+
+  .s-icon {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--success); box-shadow: 0 0 10px var(--success);
+    flex-shrink: 0; transition: all .4s;
+  }
+
+  .s-icon.attack { background:var(--danger); box-shadow:0 0 14px var(--danger); animation:icon-atk .8s ease infinite; }
+  @keyframes icon-atk { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.3;transform:scale(1.4);} }
+
+  .s-badge {
+    font-family: var(--font-display);
+    font-size: 20px; font-weight: 700;
+    letter-spacing: 1px; color: var(--success);
+    transition: color .4s;
+  }
+
+  .s-badge.attack { color: var(--danger); }
+
+  .proc-spin {
+    width: 14px; height: 14px;
+    border: 1.5px solid var(--border-soft);
+    border-top-color: var(--caramel);
+    border-radius: 50%; display: none;
+    animation: spin .7s linear infinite; flex-shrink: 0;
+  }
+  .proc-spin.on { display: block; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+
+  .flow-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+
+  .f-stat {
+    background: rgba(22,20,18,0.7);
+    border: 1px solid rgba(42,37,33,0.8);
+    border-radius: 5px; padding: 9px 12px;
+  }
+
+  .f-lbl {
+    font-family: var(--font-body); font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-muted); margin-bottom: 4px;
+  }
+
+  .f-val {
+    font-family: var(--font-display); font-size: 11px; font-weight: 500;
+    color: var(--latte); word-break: break-all;
+  }
+
+  .f-span2 { grid-column: 1/-1; }
+
+  /* ─── SESSION ─── */
+  .sess-panel { display:flex; flex-direction:column; gap:10px; }
+
+  .ov-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+
+  .ov-cell {
+    text-align: center; padding: 12px 6px;
+    background: rgba(22,20,18,0.7);
+    border-radius: 6px; border: 1px solid rgba(42,37,33,0.7);
+  }
+
+  .ov-val { font-family:var(--font-display); font-size:22px; font-weight:700; transition:color .3s; }
+  .ov-lbl { font-family:var(--font-body); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); margin-top:3px; }
+
+  /* ─── LEVEL 2 ─── */
+  .l2-panel {
+    background: linear-gradient(180deg, #1c1512, #12100e);
+    border: 1px solid rgba(201,123,99,0.2);
+    border-left: 2px solid var(--danger);
+    border-radius: 8px;
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height .55s cubic-bezier(.4,0,.2,1), opacity .4s;
+  }
+
+  .l2-panel.vis { max-height: 660px; opacity: 1; }
+  .l2-inner { padding: 20px 26px; }
+  .l2-grid { display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:14px; }
+  .atk-info { display:flex; flex-direction:column; gap:13px; }
+
+  .atk-type {
+    display: inline-flex; align-items: center;
+    background: rgba(201,123,99,0.08);
+    border: 1px solid rgba(201,123,99,0.22);
+    border-radius: 5px; padding: 10px 16px;
+    color: var(--danger);
+    font-family: var(--font-display);
+    font-size: 15px; font-weight: 700; letter-spacing: 1.5px;
+    width: fit-content; text-transform: uppercase;
+  }
+
+  .conf-row { display:flex; align-items:center; gap:10px; }
+  .conf-track { flex:1; height:3px; background:var(--border-soft); border-radius:2px; overflow:hidden; }
+  .conf-fill { height:100%; background:var(--danger); border-radius:2px; width:0%; transition:width .7s ease; }
+  .conf-val { font-family:var(--font-display); font-size:11px; color:var(--danger); min-width:36px; font-weight:600; }
+
+  .sev-badge {
+    display: inline-flex; padding: 3px 11px; border-radius: 4px;
+    font-family: var(--font-display); font-size: 9px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase;
+  }
+
+  .sev-crit { background:rgba(201,123,99,.15); color:var(--danger); border:1px solid rgba(201,123,99,.3); }
+  .sev-high { background:rgba(184,122,74,.15); color:#b87a4a; border:1px solid rgba(184,122,74,.3); }
+  .sev-med { background:rgba(176,137,104,.15); color:var(--caramel); border:1px solid rgba(176,137,104,.3); }
+
+  .feat-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:5px; }
+
+  .f-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 10px;
+    background: rgba(22,20,18,0.8);
+    border-radius: 4px; border: 1px solid rgba(42,37,33,0.8);
+  }
+
+  .fn { font-family:var(--font-body); font-size:12px; font-weight:500; color:var(--text-muted); }
+  .fv { font-family:var(--font-display); font-size:10px; font-weight:600; color:var(--latte); }
+
+  /* ─── GRAPHS ─── */
+  .graphs-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+
+  .g-card {
+    background: linear-gradient(180deg, #1b1815, #13110f);
+    border: 1px solid var(--border-soft); border-radius: 8px; padding:14px 16px;
+  }
+
+  .g-title {
+    font-family: var(--font-display); font-size: 9px; font-weight: 600;
+    letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--mocha); margin-bottom: 10px;
+  }
+
+  .gc-wrap { height: 125px; position: relative; }
+  .spike-flash { position:absolute; inset:0; border-radius:6px; background:rgba(201,123,99,.07); opacity:0; pointer-events:none; transition:opacity .15s; }
+  .spike-flash.on { opacity:1; }
+
+  /* ─── CONSOLE ─── */
+  .con-card {
+    background: linear-gradient(180deg, #1b1815, #13110f);
+    border: 1px solid var(--border-soft); border-radius: 8px; overflow: hidden;
+  }
+
+  .con-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    background: rgba(22,20,18,0.9);
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .con-dots { display:flex; gap:6px; }
+  .con-dot { width:8px; height:8px; border-radius:50%; }
+
+  .con-body {
+    font-family: var(--font-body);
+    font-size: 12px; font-weight: 400;
+    height: 195px; overflow-y: auto;
+    padding: 12px 16px; line-height: 1.9;
+    color: var(--text-muted);
+  }
+
+  .con-body::-webkit-scrollbar { width: 3px; }
+  .con-body::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 2px; }
+
+  .log-row {
+    display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline;
+    animation: log-in .25s ease; padding: 2px 5px; border-radius: 3px;
+    cursor: pointer; transition: background .15s;
+  }
+
+  .log-row:hover { background: rgba(176,137,104,0.05); }
+
+  @keyframes log-in { from{opacity:0;transform:translateY(-3px);} to{opacity:1;transform:none;} }
+
+  .lt { color:var(--mocha); min-width:80px; font-weight:600; }
+  .lf { color:rgba(200,182,166,0.35); }
+  .lp { color:var(--text-muted); font-weight:500; }
+  .lb { color:rgba(125,163,125,0.5); }
+  .l-ok { color:var(--success); font-weight:700; }
+  .l-atk { color:var(--danger); font-weight:700; }
+  .l-type { color:var(--caramel); font-weight:600; }
+  .l-allow { color:rgba(125,163,125,0.6); }
+  .l-esc { color:rgba(176,137,104,0.7); font-weight:500; }
+
+  /* ─── FEATURE INSPECT ─── */
+  .fi-panel {
+    background: linear-gradient(180deg, #1b1815, #13110f);
+    border: 1px solid var(--border-soft); border-radius: 8px;
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height .5s ease, opacity .3s;
+  }
+
+  .fi-panel.vis { max-height: 460px; opacity: 1; }
+  .fi-inner { padding: 20px 26px; }
+
+  .fi-groups { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-top:14px; }
+
+  .fi-group {
+    background: rgba(22,20,18,0.8);
+    border: 1px solid rgba(42,37,33,0.8);
+    border-radius: 7px; padding: 12px 13px;
+  }
+
+  .fi-gtitle {
+    font-family: var(--font-display); font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--mocha); margin-bottom: 9px; padding-bottom: 7px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .fi-item {
+    display: flex; justify-content: space-between; padding: 4px 0;
+    font-size: 12px; border-bottom: 1px solid rgba(42,37,33,0.4);
+    font-family: var(--font-body);
+  }
+
+  .fi-item:last-child { border-bottom: none; }
+  .fin { color:var(--text-muted); font-weight:500; }
+  .fiv { font-family:var(--font-display); color:var(--latte); font-size:10px; font-weight:500; }
+
+  /* small utility */
+  .row-sub { font-family:var(--font-body); font-size:11px; color:var(--text-muted); font-weight:400; }
+
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border-soft); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <div class="logo-mark">S</div>
+    <div>
+      <div class="logo-text">SENTRYAI</div>
+      <div class="logo-sub">AI-Powered IoT Intrusion Detection System</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><div class="status-dot"></div>System Active</div>
+    <div class="header-time" id="clock">--:--:--</div>
+    <div class="pi-status" id="piStatusPill"><div class="pi-dot" id="piDot"></div><span id="piStatusText">Raspberry Pi — Connecting…</span></div>
+    <div class="pi-status" style="background:rgba(42,37,33,0.2);border-color:rgba(42,37,33,0.4)" id="latencyPill">
+      <span style="color:var(--mocha);font-size:10px;letter-spacing:.5px">LATENCY</span>
+      <span style="font-family:var(--font-display);color:var(--caramel);font-size:11px;font-weight:600" id="latencyVal">— ms</span>
+    </div>
+  </div>
+</header>
+
+<div class="proc-bar"><div class="proc-fill" id="procFill"></div></div>
+
+<!-- THREAT TICKER -->
+<div class="threat-ticker">
+  <div class="tk-group">
+    <div class="tk-label">Total Flows</div>
+    <div class="tk-val" id="tkTotal">0</div>
+  </div>
+  <div class="tk-div"></div>
+  <div class="tk-group">
+    <div class="tk-label">Attacks</div>
+    <div class="tk-val" style="color:var(--danger)" id="tkAttacks">0</div>
+  </div>
+  <div class="tk-div"></div>
+  <div class="tk-group">
+    <div class="tk-label">Benign</div>
+    <div class="tk-val" style="color:var(--success)" id="tkBenign">0</div>
+  </div>
+  <div class="tk-div"></div>
+  <div class="tk-group">
+    <div class="tk-label">Flows / min</div>
+    <div class="tk-val" style="color:var(--caramel)" id="tkRate">—</div>
+  </div>
+  <div class="tk-div"></div>
+  <div class="tk-group">
+    <div class="tk-label">Uptime</div>
+    <div class="tk-val" style="color:var(--latte)" id="tkUptime">00:00</div>
+  </div>
+  <div class="tk-div"></div>
+  <div class="threat-wrap">
+    <div class="tk-label">Current Threat Level</div>
+    <div class="threat-segs">
+      <div class="t-seg" id="seg1"></div>
+      <div class="t-seg" id="seg2"></div>
+      <div class="t-seg" id="seg3"></div>
+      <div class="t-seg" id="seg4"></div>
+    </div>
+    <div class="threat-lbl" id="threatLbl">NOMINAL</div>
+  </div>
+</div>
+
+<main>
+
+  <!-- LEVEL 1 -->
+  <div>
+    <div class="sec-row">
+      <div class="sec-lbl">Level 01 — Binary Detection</div>
+      <div class="div-line"></div>
+      <div style="font-family:var(--font-display);font-size:9px;color:var(--mocha);letter-spacing:1px" id="procStatus">IDLE</div>
+    </div>
+
+    <div class="l1-grid">
+      <div class="det-box" id="detBox">
+        <div class="box-lbl">Incoming Traffic Status</div>
+        <div class="ts-row">
+          <div class="s-icon" id="sIcon"></div>
+          <div class="s-badge" id="sBadge">INITIALIZING</div>
+          <div class="proc-spin" id="procSpin"></div>
+        </div>
+        <div class="flow-grid">
+          <div class="f-stat f-span2">
+            <div class="f-lbl">Flow ID</div>
+            <div class="f-val" id="flowId">—</div>
+          </div>
+          <div class="f-stat">
+            <div class="f-lbl">Destination Port</div>
+            <div class="f-val" id="destPort">—</div>
+          </div>
+          <div class="f-stat">
+            <div class="f-lbl">Flow Duration</div>
+            <div class="f-val" id="flowDur">—</div>
+          </div>
+          <div class="f-stat">
+            <div class="f-lbl">Flow Bytes / sec</div>
+            <div class="f-val" id="flowBps">—</div>
+          </div>
+          <div class="f-stat">
+            <div class="f-lbl">Flow Packets / sec</div>
+            <div class="f-val" id="flowPps">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SESSION PANEL -->
+      <div class="sess-panel">
+        <div class="g-card" style="flex:1">
+          <div class="g-title">Session Overview</div>
+          <div class="ov-grid">
+            <div class="ov-cell">
+              <div class="ov-val" style="color:var(--success)" id="ovBenign">0</div>
+              <div class="ov-lbl">Benign</div>
+            </div>
+            <div class="ov-cell">
+              <div class="ov-val" style="color:var(--danger)" id="ovAttacks">0</div>
+              <div class="ov-lbl">Attacks</div>
+            </div>
+            <div class="ov-cell">
+              <div class="ov-val" style="color:var(--caramel)" id="ovTotal">0</div>
+              <div class="ov-lbl">Total</div>
+            </div>
+          </div>
+          <div style="margin-top:13px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <div class="row-sub" style="font-weight:600;text-transform:uppercase;letter-spacing:.8px">Attack Ratio</div>
+              <div style="font-family:var(--font-display);font-size:10px;color:var(--caramel);font-weight:600" id="atkPct">0%</div>
+            </div>
+            <div style="height:3px;background:var(--border-soft);border-radius:2px;overflow:hidden">
+              <div style="height:100%;border-radius:2px;width:0%;transition:width .5s;background:linear-gradient(90deg,var(--success),var(--danger))" id="atkBar"></div>
+            </div>
+          </div>
+        </div>
+        <div class="g-card">
+          <div class="g-title">Last Classification</div>
+          <div id="lastClass" style="color:var(--text-muted);font-size:13px;font-style:italic;font-family:var(--font-body)">Awaiting first detection...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEVEL 2 -->
+  <div class="l2-panel" id="l2Panel">
+    <div class="l2-inner">
+      <div class="sec-row" style="margin-bottom:0">
+        <div class="sec-lbl" style="color:rgba(201,123,99,.6)">Level 02 — Attack Classification</div>
+        <div class="div-line" style="background:linear-gradient(90deg,rgba(201,123,99,.2),transparent)"></div>
+      </div>
+      <div class="l2-grid">
+        <div class="atk-info">
+          <div class="atk-type" id="atkType">—</div>
+          <div>
+            <div style="font-family:var(--font-body);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:8px">Confidence Score</div>
+            <div class="conf-row">
+              <div class="conf-track"><div class="conf-fill" id="confFill"></div></div>
+              <div class="conf-val" id="confVal">0%</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-family:var(--font-body);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)">Severity</div>
+            <div class="sev-badge sev-crit" id="sevBadge">Critical</div>
+          </div>
+          <div style="padding:10px 13px;background:rgba(22,20,18,.8);border-radius:5px;border:1px solid rgba(42,37,33,.8)">
+            <div style="font-family:var(--font-body);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:5px">Recommended Action</div>
+            <div style="font-family:var(--font-body);font-size:13px;font-weight:500;color:var(--latte)" id="recAction">—</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-body);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px">Attack Feature Summary</div>
+          <div class="feat-grid">
+            <div class="f-row"><span class="fn">Fwd Packets</span><span class="fv" id="f0">—</span></div>
+            <div class="f-row"><span class="fn">Bwd Packets</span><span class="fv" id="f1">—</span></div>
+            <div class="f-row"><span class="fn">Pkt Len Mean</span><span class="fv" id="f2">—</span></div>
+            <div class="f-row"><span class="fn">Pkt Len Var</span><span class="fv" id="f3">—</span></div>
+            <div class="f-row"><span class="fn">SYN Flags</span><span class="fv" id="f4">—</span></div>
+            <div class="f-row"><span class="fn">RST Flags</span><span class="fv" id="f5">—</span></div>
+            <div class="f-row"><span class="fn">ACK Flags</span><span class="fv" id="f6">—</span></div>
+            <div class="f-row"><span class="fn">Flow IAT Mean</span><span class="fv" id="f7">—</span></div>
+            <div class="f-row"><span class="fn">Active Mean</span><span class="fv" id="f8">—</span></div>
+            <div class="f-row"><span class="fn">Idle Mean</span><span class="fv" id="f9">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRAPHS -->
+  <div>
+    <div class="sec-row"><div class="sec-lbl">Real-Time Network Metrics</div><div class="div-line"></div></div>
+    <div class="graphs-grid">
+      <div class="g-card">
+        <div class="g-title">Flow Bytes / sec</div>
+        <div class="gc-wrap"><div class="spike-flash" id="flashBps"></div><canvas id="cBps"></canvas></div>
+      </div>
+      <div class="g-card">
+        <div class="g-title">Packets / sec</div>
+        <div class="gc-wrap"><div class="spike-flash" id="flashPps"></div><canvas id="cPps"></canvas></div>
+      </div>
+      <div class="g-card">
+        <div class="g-title">Protocol Distribution</div>
+        <div class="gc-wrap"><canvas id="cProto"></canvas></div>
+      </div>
+      <div class="g-card">
+        <div class="g-title">Attack vs Benign</div>
+        <div class="gc-wrap"><canvas id="cAB"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONSOLE -->
+  <div>
+    <div class="sec-row">
+      <div class="sec-lbl">Traffic Log Console</div>
+      <div class="div-line"></div>
+      <div style="font-family:var(--font-display);font-size:9px;color:var(--mocha);letter-spacing:1px" id="logCount">0 EVENTS</div>
+    </div>
+    <div class="con-card">
+      <div class="con-hdr">
+        <div class="con-dots">
+          <div class="con-dot" style="background:rgba(201,123,99,.35)"></div>
+          <div class="con-dot" style="background:rgba(176,137,104,.35)"></div>
+          <div class="con-dot" style="background:rgba(125,163,125,.35)"></div>
+        </div>
+        <div style="font-family:var(--font-display);font-size:9px;color:var(--mocha);letter-spacing:1px">sentry@raspberrypi ~ live-ids-monitor</div>
+        <div style="font-family:var(--font-display);font-size:9px;color:var(--mocha);letter-spacing:1px" id="logFps">0.0 flows/s</div>
+      </div>
+      <div class="con-body" id="conBody"></div>
+    </div>
+  </div>
+
+  <!-- FEATURE INSPECT -->
+  <div>
+    <div class="sec-row">
+      <div class="sec-lbl">Feature Inspection Panel</div>
+      <div class="div-line"></div>
+      <div style="font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer" onclick="closeInspect()">Click any log row to inspect — click here to close</div>
+    </div>
+    <div class="fi-panel" id="fiPanel">
+      <div class="fi-inner">
+        <div style="font-family:var(--font-body);font-size:13px;font-weight:500;color:var(--text-muted)">
+          Full Feature Breakdown —
+          <span id="fiFlowId" style="font-family:var(--font-display);font-size:10px;color:var(--mocha);letter-spacing:.5px"></span>
+        </div>
+        <div class="fi-groups">
+          <div class="fi-group">
+            <div class="fi-gtitle">Traffic Volume</div>
+            <div class="fi-item"><span class="fin">Total Fwd Pkts</span><span class="fiv" id="i0">—</span></div>
+            <div class="fi-item"><span class="fin">Total Bwd Pkts</span><span class="fiv" id="i1">—</span></div>
+            <div class="fi-item"><span class="fin">Flow Bytes/s</span><span class="fiv" id="i2">—</span></div>
+            <div class="fi-item"><span class="fin">Flow Pkts/s</span><span class="fiv" id="i3">—</span></div>
+            <div class="fi-item"><span class="fin">Sub Fwd Bytes</span><span class="fiv" id="i4">—</span></div>
+            <div class="fi-item"><span class="fin">Sub Bwd Bytes</span><span class="fiv" id="i5">—</span></div>
+          </div>
+          <div class="fi-group">
+            <div class="fi-gtitle">Packet Size</div>
+            <div class="fi-item"><span class="fin">Pkt Len Mean</span><span class="fiv" id="i6">—</span></div>
+            <div class="fi-item"><span class="fin">Pkt Len Std</span><span class="fiv" id="i7">—</span></div>
+            <div class="fi-item"><span class="fin">Pkt Len Var</span><span class="fiv" id="i8">—</span></div>
+            <div class="fi-item"><span class="fin">Fwd Pkt Max</span><span class="fiv" id="i9">—</span></div>
+            <div class="fi-item"><span class="fin">Bwd Pkt Max</span><span class="fiv" id="i10">—</span></div>
+          </div>
+          <div class="fi-group">
+            <div class="fi-gtitle">Time-Based</div>
+            <div class="fi-item"><span class="fin">Flow IAT Mean</span><span class="fiv" id="i11">—</span></div>
+            <div class="fi-item"><span class="fin">Flow IAT Std</span><span class="fiv" id="i12">—</span></div>
+            <div class="fi-item"><span class="fin">Active Mean</span><span class="fiv" id="i13">—</span></div>
+            <div class="fi-item"><span class="fin">Idle Mean</span><span class="fiv" id="i14">—</span></div>
+            <div class="fi-item"><span class="fin">Flow Duration</span><span class="fiv" id="i15">—</span></div>
+          </div>
+          <div class="fi-group">
+            <div class="fi-gtitle">TCP Flags</div>
+            <div class="fi-item"><span class="fin">SYN Count</span><span class="fiv" id="i16">—</span></div>
+            <div class="fi-item"><span class="fin">ACK Count</span><span class="fiv" id="i17">—</span></div>
+            <div class="fi-item"><span class="fin">RST Count</span><span class="fiv" id="i18">—</span></div>
+            <div class="fi-item"><span class="fin">PSH Count</span><span class="fiv" id="i19">—</span></div>
+            <div class="fi-item"><span class="fin">FIN Count</span><span class="fiv" id="i20">—</span></div>
+          </div>
+          <div class="fi-group">
+            <div class="fi-gtitle">Flow Behavior</div>
+            <div class="fi-item"><span class="fin">Down/Up Ratio</span><span class="fiv" id="i21">—</span></div>
+            <div class="fi-item"><span class="fin">Avg Pkt Size</span><span class="fiv" id="i22">—</span></div>
+            <div class="fi-item"><span class="fin">Init Win Fwd</span><span class="fiv" id="i23">—</span></div>
+            <div class="fi-item"><span class="fin">Init Win Bwd</span><span class="fiv" id="i24">—</span></div>
+            <div class="fi-item"><span class="fin">Active Max</span><span class="fiv" id="i25">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─── CLOCK & UPTIME
+const t0 = Date.now();
+function tick() {
+  const n = new Date();
+  document.getElementById('clock').textContent = n.toTimeString().split(' ')[0];
+  const s = Math.floor((Date.now() - t0) / 1000);
+  document.getElementById('tkUptime').textContent =
+    String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+}
+setInterval(tick, 1000); tick();
+
+// ─── CHART DEFAULTS
+Chart.defaults.color = '#6f4e37';
+Chart.defaults.borderColor = '#2a2521';
+Chart.defaults.font.family = "'Orbitron', monospace";
+Chart.defaults.font.size = 8;
+
+const baseOpts = {
+  responsive:true, maintainAspectRatio:false, animation:{duration:300},
+  plugins:{
+    legend:{display:false},
+    tooltip:{backgroundColor:'#1b1815',borderColor:'#2a2521',borderWidth:1,titleColor:'#a59b91',bodyColor:'#f2eee9',padding:8,titleFont:{family:'Orbitron',size:9},bodyFont:{family:'Rajdhani',size:12}}
+  },
+  scales:{
+    x:{grid:{color:'rgba(42,37,33,0.6)'},ticks:{maxRotation:0,color:'#6f4e37',maxTicksLimit:5}},
+    y:{grid:{color:'rgba(42,37,33,0.6)'},ticks:{color:'#6f4e37'}}
+  }
+};
+
+const bpsD={labels:[],datasets:[{data:[],borderColor:'#b08968',backgroundColor:'rgba(176,137,104,.07)',borderWidth:1.5,tension:.45,fill:true,pointRadius:0}]};
+const cBps=new Chart(document.getElementById('cBps'),{type:'line',data:bpsD,options:JSON.parse(JSON.stringify(baseOpts))});
+
+const ppsD={labels:[],datasets:[{data:[],borderColor:'#7da37d',backgroundColor:'rgba(125,163,125,.07)',borderWidth:1.5,tension:.45,fill:true,pointRadius:0}]};
+const cPps=new Chart(document.getElementById('cPps'),{type:'line',data:ppsD,options:JSON.parse(JSON.stringify(baseOpts))});
+
+const protoD={labels:['HTTPS','HTTP','SSH','FTP','Other'],datasets:[{data:[40,25,15,10,10],backgroundColor:['#b08968','#7da37d','#c97b63','#8a7060','#5a4a38'],borderWidth:0,hoverOffset:4}]};
+new Chart(document.getElementById('cProto'),{type:'doughnut',data:protoD,options:{
+  responsive:true,maintainAspectRatio:false,cutout:'62%',
+  plugins:{
+    legend:{display:true,position:'right',labels:{boxWidth:7,padding:8,color:'#a59b91',font:{family:'Rajdhani',size:11}}},
+    tooltip:{backgroundColor:'#1b1815',borderColor:'#2a2521',borderWidth:1,padding:8,bodyFont:{family:'Rajdhani',size:12}}
+  }
+}});
+
+const abD={labels:['Benign','Attack'],datasets:[{data:[0,0],backgroundColor:['rgba(125,163,125,.2)','rgba(201,123,99,.2)'],borderColor:['#7da37d','#c97b63'],borderWidth:1,borderRadius:3}]};
+const abOpts=JSON.parse(JSON.stringify(baseOpts));
+abOpts.plugins.legend={display:false};
+const cAB=new Chart(document.getElementById('cAB'),{type:'bar',data:abD,options:abOpts});
+
+// ─── STATE
+let bCnt=0,aCnt=0,tot=0,logCnt=0;
+const recent=[];
+const ftimes=[];
+
+const PORTS=[80,443,22,21,8080,3306,53,25];
+const PNAMES={80:'HTTP',443:'HTTPS',22:'SSH',21:'FTP',8080:'HTTP',3306:'MySQL',53:'DNS',25:'SMTP'};
+const ATYPES=['DDoS','PortScan','Bot','Web Attack','Brute Force','Infiltration'];
+const ACTIONS={
+  'DDoS':'Rate-limit source IP, notify NOC',
+  'PortScan':'Block source IP, log for forensics',
+  'Bot':'Quarantine endpoint, run malware scan',
+  'Web Attack':'Trigger WAF rule, block request',
+  'Brute Force':'Lock account, alert administrator',
+  'Infiltration':'Isolate host, initiate packet capture'
+};
+
+function ri(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+function rf(a,b){return +(Math.random()*(b-a)+a).toFixed(2);}
+
+// ─── PI CONFIG (change IP here if needed) ────────────────────────────────────
+const PI_URL = 'http://172.24.59.245:5000/predict';
+const FETCH_TIMEOUT = 3000;
+
+// ─── PI STATUS UI ────────────────────────────────────────────────────────────
+function setPiStatus(online, rtt) {
+  const dot  = document.getElementById('piDot');
+  const lbl  = document.getElementById('piStatusText');
+  const lval = document.getElementById('latencyVal');
+  if (online) {
+    dot.style.background = 'var(--success)'; dot.style.boxShadow = '0 0 8px var(--success)';
+    lbl.textContent  = 'Raspberry Pi \u2014 Online';
+    lval.textContent = rtt + ' ms';
+    lval.style.color = rtt < 100 ? 'var(--success)' : rtt < 300 ? 'var(--caramel)' : 'var(--danger)';
+  } else {
+    dot.style.background = 'var(--danger)'; dot.style.boxShadow = '0 0 8px var(--danger)';
+    lbl.textContent  = 'Raspberry Pi \u2014 Offline (Demo)';
+    lval.textContent = '\u2014'; lval.style.color = 'var(--text-muted)';
+  }
+}
+
+// ─── FETCH FROM RASPBERRY PI ─────────────────────────────────────────────────
+async function fetchFromPi() {
+  const t0r = Date.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
+  try {
+    const res  = await fetch(PI_URL, { signal: ctrl.signal });
+    clearTimeout(timer);
+    const data = await res.json();
+    setPiStatus(true, Date.now() - t0r);
+    return data;
+  } catch(e) {
+    clearTimeout(timer);
+    setPiStatus(false, null);
+    return null;
+  }
+}
+
+// ─── MAP PI JSON → internal flow object ──────────────────────────────────────
+function piDataToFlow(data) {
+  const att   = data.level1 === 'ATTACK';
+  const atype = data.level2 || ATYPES[ri(0,ATYPES.length-1)];
+  const conf  = +(data.confidence || 0).toFixed(2);
+  const f     = data.flow || {};
+  const bps  = f.flow_bytes_per_s  != null ? Math.round(f.flow_bytes_per_s)  : (att?ri(120000,580000):ri(1800,28000));
+  const pps  = f.flow_pkts_per_s   != null ? Math.round(f.flow_pkts_per_s)   : (att?ri(300,3000):ri(8,90));
+  const port = f.dst_port          != null ? f.dst_port                       : PORTS[ri(0,PORTS.length-1)];
+  const dur  = f.flow_duration      != null ? Math.round(f.flow_duration/1000) : ri(200,12000);
+  const src  = f.src_ip || '192.168.'+ri(1,5)+'.'+ri(2,250);
+  const dst  = f.dst_ip || ri(10,220)+'.'+ri(1,250)+'.'+ri(1,250)+'.'+ri(1,250);
+  const syn  = f.syn_flag_cnt  != null ? f.syn_flag_cnt : (att?ri(150,700):ri(1,4));
+  const rst  = f.rst_flag_cnt  != null ? f.rst_flag_cnt : (att?ri(80,400):ri(0,2));
+  const ack  = f.ack_flag_cnt  != null ? f.ack_flag_cnt : (att?ri(300,1500):ri(5,60));
+  const fp   = f.tot_fwd_pkts  != null ? f.tot_fwd_pkts : (att?ri(800,8000):ri(5,60));
+  const bp   = f.tot_bwd_pkts  != null ? f.tot_bwd_pkts : (att?ri(300,3000):ri(2,35));
+  const pm   = f.pkt_len_mean  != null ? +f.pkt_len_mean.toFixed(2) : rf(40,1400);
+  const pv   = f.pkt_len_var   != null ? +f.pkt_len_var.toFixed(2)  : rf(200,60000);
+  const iat  = f.flow_iat_mean != null ? +f.flow_iat_mean.toFixed(2): rf(10,6000);
+  const am   = f.active_mean   != null ? +f.active_mean.toFixed(2)  : rf(100,25000);
+  const im   = f.idle_mean     != null ? +f.idle_mean.toFixed(2)    : rf(500,120000);
+  const sev  = conf >= 90 ? 'Critical' : conf >= 75 ? 'High' : 'Medium';
+  return {
+    att,port,bps,pps,atype,conf,sev,fromPi:true,
+    flowId:src+':'+ri(30000,65535)+' -> '+dst+':'+port,
+    flowNum:ri(10000,99999), proto:PNAMES[port]||'TCP',
+    dur,fp,bp,pm,pv,syn,rst,ack,iat,am,im,
+    pstd:rf(20,900),fpmax:ri(64,1500),bpmax:ri(64,1500),iatStd:rf(50,12000),
+    psh:att?ri(0,60):ri(0,5),fin:att?ri(0,25):ri(1,4),
+    dur2:rf(0,3.5),aps:rf(40,900),iwf:ri(0,65535),iwb:ri(0,65535),
+    amax:rf(1000,250000),sfb:ri(100,120000),sbb:ri(100,60000)
+  };
+}
+
+// ─── DEMO FALLBACK (used when Pi is unreachable) ─────────────────────────────
+function genFlow(){
+  const att=Math.random()<0.3;
+  const port=PORTS[ri(0,PORTS.length-1)];
+  const bps=att?ri(120000,580000):ri(1800,28000);
+  const pps=att?ri(300,3000):ri(8,90);
+  const src='192.168.'+ri(1,5)+'.'+ri(2,250);
+  const dst=ri(10,220)+'.'+ri(1,250)+'.'+ri(1,250)+'.'+ri(1,250);
+  const atype=ATYPES[ri(0,ATYPES.length-1)];
+  return{
+    att,port,bps,pps,atype,fromPi:false,
+    flowId:src+':'+ri(30000,65535)+' -> '+dst+':'+port,
+    flowNum:ri(10000,99999),proto:PNAMES[port]||'TCP',
+    dur:ri(200,12000),conf:ri(74,99),
+    sev:att?(Math.random()<.55?'Critical':'High'):'Low',
+    fp:att?ri(800,8000):ri(5,60),bp:att?ri(300,3000):ri(2,35),
+    pm:rf(40,1400),pv:rf(200,60000),
+    syn:att?ri(150,700):ri(1,4),rst:att?ri(80,400):ri(0,2),
+    ack:att?ri(300,1500):ri(5,60),
+    iat:rf(10,6000),am:rf(100,25000),im:rf(500,120000),
+    pstd:rf(20,900),fpmax:ri(64,1500),bpmax:ri(64,1500),
+    iatStd:rf(50,12000),psh:att?ri(0,60):ri(0,5),fin:att?ri(0,25):ri(1,4),
+    dur2:rf(0,3.5),aps:rf(40,900),iwf:ri(0,65535),iwb:ri(0,65535),
+    amax:rf(1000,250000),sfb:ri(100,120000),sbb:ri(100,60000)
+  };
+}
+
+// ─── UNIFIED FLOW GETTER ──────────────────────────────────────────────────────
+async function getFlow() {
+  const data = await fetchFromPi();
+  return data ? piDataToFlow(data) : genFlow();
+}
+
+function updateThreat(){
+  const r10=recent.slice(-10);
+  const n=r10.filter(x=>x).length;
+  let lv,lbl,col;
+  if(n>=6){lv=4;lbl='CRITICAL';col='var(--danger)';}
+  else if(n>=3){lv=3;lbl='HIGH';col='#b87a4a';}
+  else if(n>=1){lv=2;lbl='MEDIUM';col='var(--caramel)';}
+  else{lv=1;lbl='NOMINAL';col='var(--text-muted)';}
+  const cls=['low','medium','high','critical'];
+  for(let i=1;i<=4;i++){
+    const s=document.getElementById('seg'+i);
+    s.className='t-seg';
+    if(i<=lv) s.classList.add(cls[i-1]);
+  }
+  const tl=document.getElementById('threatLbl');
+  tl.textContent=lbl; tl.style.color=col;
+}
+
+function runProcessing(){
+  return new Promise(res=>{
+    const fill=document.getElementById('procFill');
+    const spin=document.getElementById('procSpin');
+    const st=document.getElementById('procStatus');
+    spin.classList.add('on');
+    st.textContent='PROCESSING...';
+    fill.style.width='0%';
+    setTimeout(()=>{fill.style.width='40%';},50);
+    setTimeout(()=>{fill.style.width='73%';},380);
+    setTimeout(()=>{fill.style.width='100%';},680);
+    setTimeout(()=>{
+      spin.classList.remove('on');
+      st.textContent='READY';
+      fill.style.transition='none'; fill.style.width='0%';
+      setTimeout(()=>{fill.style.transition='width 0.7s ease';},100);
+      res();
+    },920);
+  });
+}
+
+function flash(id){
+  const el=document.getElementById(id);
+  el.classList.add('on');
+  setTimeout(()=>el.classList.remove('on'),350);
+}
+
+function openInspect(fl){
+  document.getElementById('fiFlowId').textContent=fl.flowId;
+  const vals=[fl.fp,fl.bp,fl.bps.toLocaleString(),fl.pps,fl.sfb.toLocaleString(),fl.sbb.toLocaleString(),
+    fl.pm,fl.pstd,fl.pv,fl.fpmax,fl.bpmax,
+    fl.iat+' ms',fl.iatStd+' ms',fl.am+' ms',fl.im+' ms',fl.dur+' ms',
+    fl.syn,fl.ack,fl.rst,fl.psh,fl.fin,
+    fl.dur2,fl.aps,fl.iwf,fl.iwb,fl.amax+' ms'];
+  vals.forEach((v,i)=>{const el=document.getElementById('i'+i);if(el)el.textContent=v;});
+  document.getElementById('fiPanel').classList.add('vis');
+}
+function closeInspect(){document.getElementById('fiPanel').classList.remove('vis');}
+
+function updateRate(){
+  const now=Date.now();
+  while(ftimes.length&&now-ftimes[0]>60000)ftimes.shift();
+  const r=(ftimes.length/60).toFixed(1);
+  document.getElementById('tkRate').textContent=r;
+  document.getElementById('logFps').textContent=r+' flows/s';
+}
+
+let busy=false;
+
+async function simulate(){
+  if(busy) return;
+  busy=true;
+  const fl=await getFlow();
+  await runProcessing();
+  const ts=new Date().toISOString().substr(11,8);
+
+  // L1
+  const box=document.getElementById('detBox');
+  const icon=document.getElementById('sIcon');
+  const badge=document.getElementById('sBadge');
+  box.classList.toggle('attack',fl.att);
+  icon.classList.toggle('attack',fl.att);
+  badge.classList.toggle('attack',fl.att);
+  badge.textContent=fl.att?'ATTACK DETECTED':'BENIGN';
+  document.getElementById('flowId').textContent=fl.flowId;
+  document.getElementById('destPort').textContent=fl.port+' ('+fl.proto+')';
+  document.getElementById('flowDur').textContent=fl.dur.toLocaleString()+' ms';
+  document.getElementById('flowBps').textContent=fl.bps.toLocaleString();
+  document.getElementById('flowPps').textContent=fl.pps.toLocaleString();
+
+  // L2
+  const l2=document.getElementById('l2Panel');
+  if(fl.att){
+    l2.classList.add('vis');
+    document.getElementById('atkType').textContent=fl.atype.toUpperCase();
+    document.getElementById('confFill').style.width=fl.conf+'%';
+    document.getElementById('confVal').textContent=fl.conf+'%';
+    const sb=document.getElementById('sevBadge');
+    sb.className='sev-badge '+(fl.sev==='Critical'?'sev-crit':'sev-high');
+    sb.textContent=fl.sev.toUpperCase();
+    document.getElementById('recAction').textContent=ACTIONS[fl.atype]||'Escalate to Level-2';
+    [fl.fp,fl.bp,fl.pm,fl.pv,fl.syn,fl.rst,fl.ack,fl.iat+' ms',fl.am+' ms',fl.im+' ms']
+      .forEach((v,i)=>document.getElementById('f'+i).textContent=v);
+  } else {
+    l2.classList.remove('vis');
+  }
+
+  // COUNTERS
+  tot++;if(fl.att)aCnt++;else bCnt++;
+  recent.push(fl.att);if(recent.length>10)recent.shift();
+  ftimes.push(Date.now());
+  document.getElementById('ovBenign').textContent=bCnt;
+  document.getElementById('ovAttacks').textContent=aCnt;
+  document.getElementById('ovTotal').textContent=tot;
+  document.getElementById('tkTotal').textContent=tot;
+  document.getElementById('tkAttacks').textContent=aCnt;
+  document.getElementById('tkBenign').textContent=bCnt;
+  const pct=tot>0?Math.round(aCnt/tot*100):0;
+  document.getElementById('atkBar').style.width=pct+'%';
+  document.getElementById('atkPct').textContent=pct+'%';
+
+  // LAST CLASS
+  const lc=document.getElementById('lastClass');
+  lc.innerHTML=fl.att
+    ?`<span style="color:var(--danger);font-weight:700;font-family:var(--font-display);font-size:12px;letter-spacing:1px">${fl.atype.toUpperCase()}</span> &nbsp;|&nbsp; Port ${fl.port} &nbsp;|&nbsp; <span style="color:var(--text-muted)">Conf: ${fl.conf}%</span> &nbsp;|&nbsp; <span style="color:var(--caramel)">${fl.sev.toUpperCase()}</span>`
+    :`<span style="color:var(--success);font-weight:700;font-family:var(--font-display);font-size:12px;letter-spacing:1px">BENIGN</span> &nbsp;|&nbsp; Port ${fl.port} (${fl.proto}) &nbsp;|&nbsp; <span style="color:var(--text-muted)">Allowed</span>`;
+
+  // CHARTS
+  const lbl=ts.substr(0,5);
+  if(bpsD.labels.length>=20){bpsD.labels.shift();bpsD.datasets[0].data.shift();}
+  bpsD.labels.push(lbl);bpsD.datasets[0].data.push(fl.bps);
+  bpsD.datasets[0].borderColor=fl.att?'#c97b63':'#b08968';
+  bpsD.datasets[0].backgroundColor=fl.att?'rgba(201,123,99,.08)':'rgba(176,137,104,.07)';
+  cBps.update();
+  if(fl.att)flash('flashBps');
+
+  if(ppsD.labels.length>=20){ppsD.labels.shift();ppsD.datasets[0].data.shift();}
+  ppsD.labels.push(lbl);ppsD.datasets[0].data.push(fl.pps);
+  ppsD.datasets[0].borderColor=fl.att?'#b87a4a':'#7da37d';
+  ppsD.datasets[0].backgroundColor=fl.att?'rgba(184,122,74,.08)':'rgba(125,163,125,.07)';
+  cPps.update();
+  if(fl.att)flash('flashPps');
+
+  abD.datasets[0].data=[bCnt,aCnt];cAB.update();
+
+  const pi=fl.port===443?0:(fl.port===80||fl.port===8080)?1:fl.port===22?2:fl.port===21?3:4;
+  protoD.datasets[0].data[pi]++;
+
+  updateThreat();
+
+  // RICH LOG
+  logCnt++;
+  document.getElementById('logCount').textContent=logCnt+' EVENTS';
+  const cb=document.getElementById('conBody');
+  const row=document.createElement('div');
+  row.className='log-row';
+  const cap=fl;
+  row.addEventListener('click',()=>openInspect(cap));
+
+  if(fl.att){
+    row.innerHTML=
+      `<span class="lt">[${ts}]</span>`+
+      `<span class="lf">FlowID:${fl.flowNum}</span>`+
+      `<span class="lp">| Port:${fl.port}</span>`+
+      `<span class="lb">| Bytes/s:${fl.bps.toLocaleString()}</span>`+
+      `<span class="lp">| Pkts/s:${fl.pps}</span>`+
+      `<span class="lp">| SYN:${fl.syn}</span>`+
+      `<span class="l-atk">| ATTACK</span>`+
+      `<span class="l-type">| ${fl.atype.toUpperCase()}</span>`+
+      `<span class="l-esc">| Escalated to Level-2</span>`+
+      (fl.fromPi?`<span style="color:var(--success);font-size:10px;opacity:.7">| Pi AI</span>`:`<span style="color:var(--mocha);font-size:10px;opacity:.6">| Demo</span>`);
+  } else {
+    row.innerHTML=
+      `<span class="lt">[${ts}]</span>`+
+      `<span class="lf">FlowID:${fl.flowNum}</span>`+
+      `<span class="lp">| Port:${fl.port}</span>`+
+      `<span class="lb">| Bytes/s:${fl.bps.toLocaleString()}</span>`+
+      `<span class="lp">| Pkts/s:${fl.pps}</span>`+
+      `<span class="l-ok">| BENIGN</span>`+
+      `<span class="l-allow">| Allowed</span>`+
+      (fl.fromPi?`<span style="color:var(--success);font-size:10px;opacity:.7">| Pi AI</span>`:`<span style="color:var(--mocha);font-size:10px;opacity:.6">| Demo</span>`);
+  }
+
+  cb.appendChild(row);
+  if(cb.children.length>80)cb.removeChild(cb.children[0]);
+  cb.scrollTop=cb.scrollHeight;
+
+  updateRate();
+  busy=false;
+}
+
+// ─── BOOT
+(async()=>{
+  await new Promise(r=>setTimeout(r,600));
+  for(let i=0;i<5;i++){
+    await simulate();
+    await new Promise(r=>setTimeout(r,200));
+  }
+  setInterval(simulate,1900);
+})();
+</script>
+</body>
+</html>

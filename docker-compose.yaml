@@ -1,0 +1,64 @@
+services:
+
+  # ── 1. Packet Capture ────────────────────────────────────────────────────────
+  capture:
+    build:
+      context: ./capture
+      dockerfile: Dockerfile
+    container_name: sentryai_capture
+    restart: unless-stopped
+    network_mode: host          # must see real network interfaces
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      FLOW_CSV:       /app/data/live_flows.csv
+      CAPTURE_IFACE:  wlan0        # ← change to your interface (ip a to check)
+      FLOW_TIMEOUT:   "10"        # seconds idle before a flow is flushed
+      FLUSH_EVERY:    "5"         # flush interval in seconds
+      MAX_ROWS:       "5000"      # rolling window — keeps CSV lean
+    volumes:
+      - flow_data:/app/data       # shared with backend
+
+  # ── 2. Flask Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sentryai_backend
+    restart: unless-stopped
+    environment:
+      FLOW_CSV:    /app/data/live_flows.csv
+      MODEL_PATH:  /app/models
+      RELOAD_SEC:  "5"
+    volumes:
+      - flow_data:/app/data       # reads live_flows.csv written by capture
+      - ./models:/app/models:ro   # your trained .pkl files
+    ports:
+      - "5000:5000"
+    depends_on:
+      - capture
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout:   5s
+      retries:   5
+      start_period: 30s
+
+  # ── 3. Nginx + Dashboard ──────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sentryai_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# ── Shared volume (capture writes, backend reads) ─────────────────────────────
+volumes:
+  flow_data:
